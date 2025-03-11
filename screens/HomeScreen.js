@@ -7,28 +7,27 @@ import {
 	Alert,
 	ScrollView,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {Button, Card, IconButton} from "react-native-paper";
+import {db} from "../firebaseConfig"; // Import Firestore instance
+import {collection, onSnapshot, deleteDoc, doc} from "firebase/firestore";
 
 export default function HomeScreen({navigation}) {
 	const [expenses, setExpenses] = useState([]);
 	const [filter, setFilter] = useState(""); // Store selected category filter
 
 	useEffect(() => {
-		const loadExpenses = async () => {
-			try {
-				const storedExpenses = await AsyncStorage.getItem("expenses");
-				if (storedExpenses) {
-					setExpenses(JSON.parse(storedExpenses));
-				}
-			} catch (error) {
-				console.error("Failed to load expenses:", error);
-			}
-		};
+		// Fetch expenses from Firestore in real-time
+		const expensesRef = collection(db, "expenses");
+		const unsubscribe = onSnapshot(expensesRef, (snapshot) => {
+			const expensesData = snapshot.docs.map((doc) => ({
+				id: doc.id,
+				...doc.data(),
+			}));
+			setExpenses(expensesData);
+		});
 
-		const unsubscribe = navigation.addListener("focus", loadExpenses);
-		return unsubscribe;
-	}, [navigation]);
+		return unsubscribe; // Unsubscribe on unmount
+	}, []);
 
 	const handleDeleteExpense = async (id) => {
 		Alert.alert(
@@ -39,14 +38,13 @@ export default function HomeScreen({navigation}) {
 				{
 					text: "Delete",
 					onPress: async () => {
-						const updatedExpenses = expenses.filter(
-							(expense) => expense.id !== id
-						);
-						await AsyncStorage.setItem(
-							"expenses",
-							JSON.stringify(updatedExpenses)
-						);
-						setExpenses(updatedExpenses);
+						try {
+							await deleteDoc(doc(db, "expenses", id));
+							Alert.alert("Success", "Expense deleted!");
+						} catch (error) {
+							console.error("Error deleting expense:", error);
+							Alert.alert("Error", "Failed to delete expense.");
+						}
 					},
 				},
 			]
@@ -62,7 +60,7 @@ export default function HomeScreen({navigation}) {
 		<View style={styles.container}>
 			<Text style={styles.title}>Your Expenses</Text>
 
-			{/* Scrollable Filter Buttons with Proper Sizing */}
+			{/* Scrollable Filter Buttons */}
 			<ScrollView
 				horizontal
 				showsHorizontalScrollIndicator={false}
@@ -160,7 +158,7 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 	},
 	expenseListContainer: {
-		flex: 1, // Makes sure FlatList takes available space below filter buttons
+		flex: 1,
 		marginTop: 10,
 	},
 	noExpenses: {

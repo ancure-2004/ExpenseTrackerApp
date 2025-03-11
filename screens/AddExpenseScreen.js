@@ -1,8 +1,9 @@
 import React, {useState, useEffect} from "react";
 import {View, StyleSheet, Alert} from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {TextInput, Button, Text} from "react-native-paper";
 import DropDownPicker from "react-native-dropdown-picker";
+import {db} from "../firebaseConfig"; // Import Firestore instance
+import {collection, addDoc, updateDoc, doc} from "firebase/firestore";
 
 export default function AddExpenseScreen({navigation, route}) {
 	const expenseToEdit = route.params?.expense || null;
@@ -36,32 +37,29 @@ export default function AddExpenseScreen({navigation, route}) {
 		}
 
 		try {
-			const storedExpenses = await AsyncStorage.getItem("expenses");
-			let expenses = storedExpenses ? JSON.parse(storedExpenses) : [];
-
 			if (expenseToEdit) {
 				// Update existing expense
-				expenses = expenses.map((exp) =>
-					exp.id === expenseToEdit.id ? {...exp, amount, category, note} : exp
-				);
-			} else {
-				// Add new expense
-				const newExpense = {
-					id: Date.now().toString(),
+				const expenseRef = doc(db, "expenses", expenseToEdit.id);
+				await updateDoc(expenseRef, {
 					amount,
 					category,
 					note,
 					date: new Date().toISOString(),
-				};
-				expenses.push(newExpense);
+				});
+
+				Alert.alert("Success", "Expense updated!");
+			} else {
+				// Add new expense
+				await addDoc(collection(db, "expenses"), {
+					amount,
+					category,
+					note,
+					date: new Date().toISOString(),
+				});
+
+				Alert.alert("Success", "Expense added!");
 			}
 
-			await AsyncStorage.setItem("expenses", JSON.stringify(expenses));
-
-			Alert.alert(
-				"Success",
-				expenseToEdit ? "Expense updated!" : "Expense added!"
-			);
 			navigation.goBack();
 		} catch (error) {
 			console.error("Error saving expense:", error);

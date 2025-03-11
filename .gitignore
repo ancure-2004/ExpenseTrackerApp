@@ -38,3 +38,8 @@ yarn-error.*
 
 firebaseConfig.js
 android/app/google-services.json
+
+# Ignore other sensitive files
+.env
+package-lock.json
+yarn.lock
